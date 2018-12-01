@@ -1,0 +1,8 @@
+| Presentation     | redefineThesis     | makeInsight        | procrastinate [free-time]              | panic                   |
+|------------------+--------------------+--------------------+----------------------------------------+-------------------------|
+| Initial          | [ ] -> Researching |                    |                                        |                         |
+| Researching      |                    | [ ] -> Writing     | [(< free-time 5)]  -> Checking Twitter | [ ] -> Initial          |
+| Writing          |                    | [ ] -> Researching | [ ]                -> Checking Twitter | [ ] -> Researching      |
+| Self Doubting    |                    |                    | [(neg? free-time)] -> Checking Twitter | [ ] -> Initial          |
+| Checking Twitter |                    | [ ] -> Researching | [(> free-time 5)]  -> Checking Twitter | [ ] -> Checking Twitter |
+| Presenting       | [ ] -> Presenting  | [ ] -> Presenting  | [ ]                -> Presenting       | [ ] -> Presenting       |

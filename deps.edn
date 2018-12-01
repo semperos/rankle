@@ -1,0 +1,23 @@
+{:paths ["resources" "src"]
+ :deps {org.clojure/clojure {:mvn/version "RELEASE"}
+        org.clojure/core.memoize {:mvn/version "0.7.1"}
+        org.clojure/spec.alpha {:mvn/version "0.2.176"}
+        net.mikera/core.matrix {:mvn/version "0.62.0"}
+        hiccup {:mvn/version "1.0.5"}
+        cheshire {:mvn/version "5.8.1"}
+        #_#_fsm-clj {:mvn/version "0.1.1"
+                 :exclusions [dorothy]}
+        dorothy {:mvn/version "0.0.7"}
+        #_#_net.cgrand/seqexp {:mvn/version "0.6.2"}
+        #_#_uncomplicate/neanderthal {:mvn/version "0.20.4"
+                                  :exclusions [org.jcuda/jcuda-natives
+                                               org.jcuda/jcublas-natives]}}
+ :aliases
+ {:test {:extra-paths ["test"]
+         :extra-deps {org.clojure/test.check {:mvn/version "RELEASE"}}}
+  :runner
+  {:extra-deps {com.cognitect/test-runner
+                {:git/url "https://github.com/cognitect-labs/test-runner"
+                 :sha "76568540e7f40268ad2b646110f237a60295fa3c"}}
+   :main-opts ["-m" "cognitect.test-runner"
+               "-d" "test"]}}}
