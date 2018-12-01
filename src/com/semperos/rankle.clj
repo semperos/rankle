@@ -17,7 +17,7 @@
   [coll]
   (clojure.core/count coll))
 
-(defn coll-shape
+(defn- coll-shape
   [coll shape]
   (if-let [x (first coll)]
     (if (coll? x)
@@ -49,47 +49,16 @@
                      (or ret coll)))
         (first ret)))))
 
-#_(or ret coll)
-#_(partition-all rows (partition-all columns coll))
-
 (defn rank
   ([x]
    (if (var? x)
      ((comp :rank meta) x)
      (count (shape x))))
   ([f r]
-   (let [f-rank (rank f)]
-     (if (= f-rank ##Inf)
-       (case r
-         0 (fn [arg]
-             (if (zero? (rank arg))
-               (f arg)
-               (map (fn [coll] (map (fn [x] (f [x])) coll)) arg)))
-         1 (fn [arg]
-             (case (rank arg)
-               1 (f arg)
-               2 (map f arg)
-               3 (map (partial map f) arg)))
-         2 (fn [arg]
-             (if (= (rank arg) 2)
-               (f arg)
-               (map f arg)))
-         3 f)
-       (case r
-         0 f
-         1 (fn [arg]
-             (if (= (rank arg) 1)
-               (f arg)
-               (map f arg)))
-         2 (fn [arg]
-             (if (= (rank arg) 2)
-               (f arg)
-               (map (partial map f) arg)))
-         3 (fn [arg]
-             (if (= (rank arg) 3)
-               (f arg)
-               (map (partial map (partial map f)) arg)))))
-     )))
+   (fn rankle [value]
+     (if (<= (rank value) r)
+       (f value)
+       (map rankle value)))))
 
 (declare ColumnMap->Table column-map)
 
@@ -493,32 +462,35 @@
 (defn check-ragged
   [x y]
   (let [shape-x (shape x)
-        shape-y (shape y)]
-    (when (not= shape-x shape-y)
-      (throw (ex-info (str "Your collections must be the same rank and shape, "
-                           "but x has shape " shape-x " and y has shape " shape-y)
-                      {:x x
-                       :y y})))))
+        shape-y (shape y)
+        cx (count shape-x)
+        cy (count shape-y)
+        min' (min cx cy)]
+    (when-not (= (take min' shape-x)
+                 (take min' shape-y))
+      (throw (ex-info (str "The shape of the lower-ranked argument must "
+                           "match the prefix of the shape of the higher "
+                           "ranked argument , but x had shape " shape-x
+                           "and y had shape " shape-y)
+                      {:x shape-x
+                       :y shape-y})))))
 
 
-;; Naive examples of multi-ranked arithmetic functions.
+;; Examples of multi-ranked arithmetic functions.
 (defn +
   ([] 0)
   ([x] x)
   ([x y]
+   (check-ragged x y)
    (cond
-     (and (coll? x) (coll? y)) (do (check-ragged x y)
-                                   (map + x y))
-     (coll? x) (if (coll? (first x))
-                 (map (partial + y) x)
-                 (map clojure.core/+ x (repeat y)))
-     (coll? y) (if (coll? (first y))
-                 (map (partial + x) y)
-                 (map clojure.core/+ y (repeat x)))
+     (and (coll? x) (coll? y)) (map + x y)
+     (coll? x) (map (rank (partial clojure.core/+ y) 0) x)
+     (coll? y) (map (rank (partial clojure.core/+ x) 0) y)
      :else (clojure.core/+ x y)))
   ([x y & more]
    (reduce + (+ x y) more)))
 
+;; TODO Use corrected + from above to correct the ones that follow.
 (defn *
   ([] 1)
   ([x] x)
