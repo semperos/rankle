@@ -544,6 +544,9 @@
   ([x y & more]
    (reduce / (/ x y) more)))
 
+;;;;;;;;;;;;;;
+;; Printing ;;
+;;;;;;;;;;;;;;
 (defn largest [x]
   (if (coll? x)
     (if (empty? x)
@@ -1312,10 +1315,10 @@
 
   ;; J
 
-  (let [coll (reshape [3 4 2] (range 1 25))]
+  (let [coll #_print-aligned (reshape [3 4 2] (range 1 25))]
     (count coll)
-    ((rank count 1) coll)
-    ((rank count 2) coll)
+    ;; ((rank count 1) coll)
+    ;; ((rank count 2) coll)
     )
 
   (+ 1 2)
@@ -1349,11 +1352,9 @@
     )
 
   (let [s "deadly"]
-    (reduce str
-            (copy [1 1 1 1 1 1] s)
-            ;; (copy [1 0 1 1 0 0] s)
-            ;; (copy [1 0 1 2 0 1] s)
-            )
+    (reduce str (copy [1 1 1 1 1 1] s))
+    ;; (reduce str (copy [1 0 1 1 0 0] s))
+    ;; (reduce str (copy [1 0 1 2 0 1] s))
     )
 
 
