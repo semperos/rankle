@@ -1,5 +1,5 @@
 (ns com.semperos.rankle
-  (:refer-clojure :exclude [+ - * / count])
+  (:refer-clojure :exclude [+ - * / > < >= <= count])
   (:require [clojure.core.memoize :as memo]
             [clojure.set :as set]
             [clojure.spec.alpha :as s]
@@ -48,27 +48,9 @@
      (count (shape x))))
   ([f r]
    (fn rankle [value]
-     (if (<= (rank value) r)
+     (if (clojure.core/<= (rank value) r)
        (f value)
        (map rankle value)))))
-
-(defn zzz
-  [l]
-  (let [l '(partial map partial map count)]
-    ;; TODO Recursive builder of the s-expressions needed.
-    ))
-
-(defn upper
-  [x]
-  (cond
-    (string? x)
-    (str/upper-case x)
-
-    (coll? x)
-    (map upper x)
-
-    :else ::error)
-  )
 
 (defn check-ragged
   [x y]
@@ -141,6 +123,62 @@
      :else (clojure.core// x y)))
   ([x y & more]
    (reduce / (/ x y) more)))
+
+(defn >
+  ([x] (if (coll? x)
+         ((rank > 0) x)
+         1))
+  ([x y]
+   (check-ragged x y)
+   (cond
+     (and (coll? x) (coll? y)) (map > x y)
+     (coll? x) (map (rank #(> % y) 0) x)
+     (coll? y) (map (rank (partial > x) 0) y)
+     :else (if (clojure.core/> x y) 1 0)))
+  ([x y & more]
+   (reduce > (> x y) more)))
+
+(defn >=
+  ([x] (if (coll? x)
+         ((rank >= 0) x)
+         1))
+  ([x y]
+   (check-ragged x y)
+   (cond
+     (and (coll? x) (coll? y)) (map >= x y)
+     (coll? x) (map (rank #(>= % y) 0) x)
+     (coll? y) (map (rank (partial >= x) 0) y)
+     :else (if (clojure.core/>= x y) 1 0)))
+  ([x y & more]
+   (reduce >= (>= x y) more)))
+
+(defn <
+  ([x] (if (coll? x)
+         ((rank < 0) x)
+         1))
+  ([x y]
+   (check-ragged x y)
+   (cond
+     (and (coll? x) (coll? y)) (map < x y)
+     (coll? x) (map (rank #(< % y) 0) x)
+     (coll? y) (map (rank (partial < x) 0) y)
+     :else (if (clojure.core/< x y) 1 0)))
+  ([x y & more]
+   (reduce < (< x y) more)))
+
+(defn <=
+  ([x] (if (coll? x)
+         ((rank <= 0) x)
+         1))
+  ([x y]
+   (check-ragged x y)
+   (cond
+     (and (coll? x) (coll? y)) (map <= x y)
+     (coll? x) (map (rank #(<= % y) 0) x)
+     (coll? y) (map (rank (partial <= x) 0) y)
+     :else (if (clojure.core/<= x y) 1 0)))
+  ([x y & more]
+   (reduce <= (<= x y) more)))
 
 ;;;;;;;;;;;;;;
 ;; Printing ;;
@@ -352,6 +390,18 @@
   (copy [1 0 1] ['a 'b 'c])
   (copy (map (partial * 2) [1 0 1]) ['a 'b 'c])
   (copy [:alpha :gamma] {:alpha "Alpha" :beta "Beta" :gamma "Gamma"})
+  )
+
+(defn upper
+  [x]
+  (cond
+    (string? x)
+    (str/upper-case x)
+
+    (coll? x)
+    (map upper x)
+
+    :else ::error)
   )
 
 (comment
