@@ -20,20 +20,15 @@
 (defn- coll-shape
   [coll shape]
   (if-let [x (first coll)]
-    (if (coll? x)
+    (if (seqable? x)
       (recur x (conj shape (count x)))
       shape)))
 
 (defn shape
   [x]
-  (cond
-    (coll? x)
+  (if (seqable? x)
     (coll-shape x [(count x)])
-
-    (string? x)
-    (coll-shape (seq x) [(count x)])
-
-    :else []))
+    []))
 
 (defn reshape
   [shape coll]
