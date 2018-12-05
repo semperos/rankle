@@ -485,56 +485,40 @@
   ([x y & more]
    (reduce + (+ x y) more)))
 
-;; TODO Use corrected + from above to correct the ones that follow.
 (defn *
   ([] 1)
   ([x] x)
   ([x y]
    (cond
-     (and (coll? x) (coll? y)) (do (check-ragged x y)
-                                   (map * x y))
-     (coll? x) (if (coll? (first x))
-                 (map (partial * y) x)
-                 (map clojure.core/* x (repeat y)))
-     (coll? y) (if (coll? (first y))
-                 (map (partial * x) y)
-                 (map clojure.core/* y (repeat x)))
+     (and (coll? x) (coll? y)) (map * x y)
+     (coll? x) (map (rank (partial clojure.core/* y) 0) x)
+     (coll? y) (map (rank (partial clojure.core/* x) 0) y)
      :else (clojure.core/* x y)))
   ([x y & more]
    (reduce * (* x y) more)))
 
 (defn -
   ([x] (if (coll? x)
-         (map clojure.core/- x)
+         ((rank clojure.core/- 0) x)
          (clojure.core/- x)))
   ([x y]
    (cond
-     (and (coll? x) (coll? y)) (do (check-ragged x y)
-                                   (map - x y))
-     (coll? x) (if (coll? (first x))
-                 (map #(- % y) x)
-                 (map clojure.core/- x (repeat y)))
-     (coll? y) (if (coll? (first y))
-                 (map #(- x %) y)
-                 (map clojure.core/- (repeat x) y))
+     (and (coll? x) (coll? y)) (map - x y)
+     (coll? x) (map (rank #(clojure.core/- % y) 0) x)
+     (coll? y) (map (rank (partial clojure.core/- x) 0) y)
      :else (clojure.core/- x y)))
   ([x y & more]
    (reduce - (- x y) more)))
 
 (defn /
   ([x] (if (coll? x)
-         (map (partial clojure.core// 1) x)
+         ((rank (partial clojure.core// 1) 0) x)
          (clojure.core// 1 x)))
   ([x y]
    (cond
-     (and (coll? x) (coll? y)) (do (check-ragged x y)
-                                   (map / x y))
-     (coll? x) (if (coll? (first x))
-                 (map (partial / y) x)
-                 (map clojure.core// x (repeat y)))
-     (coll? y) (if (coll? (first y))
-                 (map (partial / x) y)
-                 (map clojure.core// y (repeat x)))
+     (and (coll? x) (coll? y)) (map / x y)
+     (coll? x) (map (rank #(clojure.core// % y) 0) x)
+     (coll? y) (map (rank (partial clojure.core// x) 0) y)
      :else (clojure.core// x y)))
   ([x y & more]
    (reduce / (/ x y) more)))
