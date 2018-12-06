@@ -1,5 +1,7 @@
 # rankle - Rank in Clojure
 
+**Alpha** This repository currently represents a set of code spikes and thought experiments.
+
 * Array programming and rank-oriented functions are inspired by [J](http://www.jsoftware.com/).
 * The column map and table abstractions are inspired by [Q](http://code.kx.com/q/).
 
