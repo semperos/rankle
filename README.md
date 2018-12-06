@@ -1,4 +1,4 @@
-# rankle - Rank in Clojure
+# Rankle - Rank in Clojure
 
 **Alpha** This repository currently represents a set of code spikes and thought
 experiments.
