@@ -2,13 +2,12 @@
  :deps {org.clojure/clojure {:mvn/version "RELEASE"}
         org.clojure/core.memoize {:mvn/version "0.7.1"}
         org.clojure/spec.alpha {:mvn/version "0.2.176"}
-        net.mikera/core.matrix {:mvn/version "0.62.0"}
-        hiccup {:mvn/version "1.0.5"}
-        cheshire {:mvn/version "5.8.1"}
-        dorothy {:mvn/version "0.0.7"}}
+        net.mikera/core.matrix {:mvn/version "0.62.0"}}
  :aliases
  {:test {:extra-paths ["test"]
          :extra-deps {org.clojure/test.check {:mvn/version "RELEASE"}}}
+  :ui {:extra-deps {hiccup {:mvn/version "1.0.5"}
+                    dorothy {:mvn/version "0.0.7"}}}
   :runner
   {:extra-deps {com.cognitect/test-runner
                 {:git/url "https://github.com/cognitect-labs/test-runner"
