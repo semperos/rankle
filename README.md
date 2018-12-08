@@ -8,6 +8,10 @@ experiments.
 
 Start by reading this repo's [Rankle](Rankle.ipynb) document.
 
+## Contributors
+
+* [Chris O'Donnell](https://github.com/codonnell)
+
 ## License
 
 This repository includes slightly modified versions of Clojure core functions as
