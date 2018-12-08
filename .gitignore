@@ -14,3 +14,4 @@ pom.xml.asc
 .rebel_readline_history
 *.tsv
 .ipynb_checkpoints
+/.rebl
