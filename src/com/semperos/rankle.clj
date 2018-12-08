@@ -1,6 +1,7 @@
 (ns com.semperos.rankle
   (:refer-clojure :exclude [+ - * / > < >= <= count])
-  (:require [clojure.core.memoize :as memo]
+  (:require [clojure.core.matrix :as mx]
+            [clojure.core.memoize :as memo]
             [clojure.set :as set]
             [clojure.spec.alpha :as s]
             [clojure.string :as str]
@@ -14,32 +15,14 @@
   [coll]
   (clojure.core/count coll))
 
-(defn- coll-shape
-  [coll shape]
-  (if-let [x (first coll)]
-    (if (seqable? x)
-      (recur x (conj shape (count x)))
-      shape)))
-
 (defn shape
   [x]
-  (if (seqable? x)
-    (coll-shape x [(count x)])
-    []))
+  (or (mx/shape x) []))
 
 (defn reshape
   [shape coll]
   {:pre [(every? number? shape)]}
-  (let [c (cycle coll)
-        dims (reverse shape)]
-    (loop [dims dims ret nil]
-      (if-let [dim (first dims)]
-        (recur (next dims)
-               (into []
-                     (comp (partition-all dim)
-                           (map vec))
-                     (or ret coll)))
-        (first ret)))))
+  (mx/reshape coll shape))
 
 (defn rank
   ([x]
@@ -47,10 +30,37 @@
      ((comp :rank meta) x)
      (count (shape x))))
   ([f r]
-   (fn rankle [value]
-     (if (clojure.core/<= (rank value) r)
-       (f value)
-       (map rankle value)))))
+   (fn rankle
+     ([arg0]
+      (if (clojure.core/<= (rank arg0) r)
+        (f arg0)
+        (map rankle arg0)))
+     ([arg0 arg1]
+      (if (clojure.core/<= (rank arg1) r)
+        (f arg0 arg1)
+        (map #(f arg0 %) arg1))))))
+
+(defn- wrap [y] (if (seqable? y) y [y]))
+
+(defn over
+  "J's /
+
+  Monadic - u Insert y
+  Dyadic  - x u Table y"
+  [f]
+  (fn overly
+    ([coll]
+     (reduce (fn [acc x]
+               (f acc x))
+             coll))
+    ([x y]
+     (let [res (for [x (wrap x)]
+                 (for [y (wrap y)]
+                   (f x y)))]
+       (if (and (seqable? x)
+                (seqable? y))
+         res
+         (first res))))))
 
 (defn check-ragged
   [x y]
@@ -62,7 +72,7 @@
     (when-not (= (take min' shape-x)
                  (take min' shape-y))
       (throw (ex-info (str "The shape of the lower-ranked argument must "
-                           "match the prefix of the shape of the higher "
+                           "match the common frame of the shape of the higher "
                            "ranked argument , but x had shape " shape-x
                            "and y had shape " shape-y)
                       {:x shape-x
@@ -76,9 +86,9 @@
   ([x y]
    (check-ragged x y)
    (cond
-     (and (coll? x) (coll? y)) (map + x y)
-     (coll? x) (map (rank (partial clojure.core/+ y) 0) x)
-     (coll? y) (map (rank (partial clojure.core/+ x) 0) y)
+     (and (seqable? x) (seqable? y)) (map + x y)
+     (seqable? x) (map (rank (partial clojure.core/+ y) 0) x)
+     (seqable? y) (map (rank (partial clojure.core/+ x) 0) y)
      :else (clojure.core/+ x y)))
   ([x y & more]
    (reduce + (+ x y) more)))
@@ -89,96 +99,181 @@
   ([x y]
    (check-ragged x y)
    (cond
-     (and (coll? x) (coll? y)) (map * x y)
-     (coll? x) (map (rank (partial clojure.core/* y) 0) x)
-     (coll? y) (map (rank (partial clojure.core/* x) 0) y)
+     (and (seqable? x) (seqable? y)) (map * x y)
+     (seqable? x) (map (rank (partial clojure.core/* y) 0) x)
+     (seqable? y) (map (rank (partial clojure.core/* x) 0) y)
      :else (clojure.core/* x y)))
   ([x y & more]
    (reduce * (* x y) more)))
 
 (defn -
-  ([x] (if (coll? x)
+  ([x] (if (seqable? x)
          ((rank clojure.core/- 0) x)
          (clojure.core/- x)))
   ([x y]
    (check-ragged x y)
    (cond
-     (and (coll? x) (coll? y)) (map - x y)
-     (coll? x) (map (rank #(clojure.core/- % y) 0) x)
-     (coll? y) (map (rank (partial clojure.core/- x) 0) y)
+     (and (seqable? x) (seqable? y)) (map - x y)
+     (seqable? x) (map (rank #(clojure.core/- % y) 0) x)
+     (seqable? y) (map (rank (partial clojure.core/- x) 0) y)
      :else (clojure.core/- x y)))
   ([x y & more]
    (reduce - (- x y) more)))
 
 (defn /
-  ([x] (if (coll? x)
+  ([x] (if (seqable? x)
          ((rank (partial clojure.core// 1) 0) x)
          (clojure.core// 1 x)))
   ([x y]
    (check-ragged x y)
    (cond
-     (and (coll? x) (coll? y)) (map / x y)
-     (coll? x) (map (rank #(clojure.core// % y) 0) x)
-     (coll? y) (map (rank (partial clojure.core// x) 0) y)
+     (and (seqable? x) (seqable? y)) (map / x y)
+     (seqable? x) (map (rank #(clojure.core// % y) 0) x)
+     (seqable? y) (map (rank (partial clojure.core// x) 0) y)
      :else (clojure.core// x y)))
   ([x y & more]
    (reduce / (/ x y) more)))
 
 (defn >
-  ([x] (if (coll? x)
+  ([x] (if (seqable? x)
          ((rank > 0) x)
          1))
   ([x y]
    (check-ragged x y)
    (cond
-     (and (coll? x) (coll? y)) (map > x y)
-     (coll? x) (map (rank #(> % y) 0) x)
-     (coll? y) (map (rank (partial > x) 0) y)
+     (and (seqable? x) (seqable? y)) (map > x y)
+     (seqable? x) (map (rank #(> % y) 0) x)
+     (seqable? y) (map (rank (partial > x) 0) y)
      :else (if (clojure.core/> x y) 1 0)))
   ([x y & more]
    (reduce > (> x y) more)))
 
 (defn >=
-  ([x] (if (coll? x)
+  ([x] (if (seqable? x)
          ((rank >= 0) x)
          1))
   ([x y]
    (check-ragged x y)
    (cond
-     (and (coll? x) (coll? y)) (map >= x y)
-     (coll? x) (map (rank #(>= % y) 0) x)
-     (coll? y) (map (rank (partial >= x) 0) y)
+     (and (seqable? x) (seqable? y)) (map >= x y)
+     (seqable? x) (map (rank #(>= % y) 0) x)
+     (seqable? y) (map (rank (partial >= x) 0) y)
      :else (if (clojure.core/>= x y) 1 0)))
   ([x y & more]
    (reduce >= (>= x y) more)))
 
 (defn <
-  ([x] (if (coll? x)
+  ([x] (if (seqable? x)
          ((rank < 0) x)
          1))
   ([x y]
    (check-ragged x y)
    (cond
-     (and (coll? x) (coll? y)) (map < x y)
-     (coll? x) (map (rank #(< % y) 0) x)
-     (coll? y) (map (rank (partial < x) 0) y)
+     (and (seqable? x) (seqable? y)) (map < x y)
+     (seqable? x) (map (rank #(< % y) 0) x)
+     (seqable? y) (map (rank (partial < x) 0) y)
      :else (if (clojure.core/< x y) 1 0)))
   ([x y & more]
    (reduce < (< x y) more)))
 
 (defn <=
-  ([x] (if (coll? x)
+  ([x] (if (seqable? x)
          ((rank <= 0) x)
          1))
   ([x y]
    (check-ragged x y)
    (cond
-     (and (coll? x) (coll? y)) (map <= x y)
-     (coll? x) (map (rank #(<= % y) 0) x)
-     (coll? y) (map (rank (partial <= x) 0) y)
+     (and (seqable? x) (seqable? y)) (map <= x y)
+     (seqable? x) (map (rank #(<= % y) 0) x)
+     (seqable? y) (map (rank (partial <= x) 0) y)
      :else (if (clojure.core/<= x y) 1 0)))
   ([x y & more]
    (reduce <= (<= x y) more)))
+
+(defprotocol IIndexable
+  (index-of [this x] "Return 0-based index of `x` in `this` or the length of `this` if `x` is not present."))
+
+(extend-protocol IIndexable
+  clojure.lang.Indexed
+  (index-of [this x]
+    (let [idx (.indexOf this x)]
+      (if (= idx -1)
+        (count this)
+        idx)))
+
+  String
+  (index-of [this x]
+    (let [idx (.indexOf this (str x))]
+      (if (= idx -1)
+        (count this)
+        idx)))
+
+  Object
+  (index-of [this x]
+    (let [idx (.indxOf this x)]
+      (if (= idx -1)
+        (count this)
+        idx))))
+
+;; TODO Consider fill
+(defn ravel
+  "J's ,
+
+  Monadic - Ravel y
+  Dyadic  - x Append y
+
+  WARNING Presently this does _not_ fill arrays, so ragged collections
+  will remain so."
+  ([y]
+   (flatten y))
+  ([x y]
+   (cond
+     (and (seqable? x) (seqable? y)) (concat x y)
+     (seqable? x) (ravel x [y])
+     (seqable? y) (ravel [x] y)
+     :else (ravel [x] [y]))))
+
+(defn in
+  "J's i."
+  ([n]
+   (cond
+     (number? n) (range n)
+     (and (vector? n) (every? number? n)) (reshape n (range (reduce * 1 n)))
+     :else (throw (IllegalArgumentException. "For 1-arity in, you must supply either a number or a vector of numbers."))))
+  ([x y]
+   (if (seqable? y)
+     (map (partial in x) y)
+     (index-of x y))))
+
+(defn from
+  "J's left-curly"
+  [x y]
+  (if (seqable? x)
+    (map #(from % y) x)
+    (nth y x)))
+
+(def alphabet
+  (map char (range 256)))
+
+;; TODO base, antibase https://code.jsoftware.com/wiki/Vocabulary/numberdot
+(defn ?
+  "J's ?.
+
+  Monadic - Roll y
+  Dyadic  - x Deal y"
+  ([y]
+   (if (seqable? y)
+     (map ? y)
+     (rand-int y)))
+  ([x y]
+   (let [ys (in y)]
+     (repeatedly x #(from (rand-int y) ys)))))
+
+(defn unicode
+  [y]
+  (if (seqable? y)
+    (map unicode y)
+    (first (Character/toChars y))))
 
 ;;;;;;;;;;;;;;
 ;; Printing ;;
