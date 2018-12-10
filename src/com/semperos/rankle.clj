@@ -251,7 +251,7 @@
     (nth y x)))
 
 (def alphabet
-  (map char (range 256)))
+  (mapv char (range 256)))
 
 ;; TODO base, antibase https://code.jsoftware.com/wiki/Vocabulary/numberdot
 (defn ?
