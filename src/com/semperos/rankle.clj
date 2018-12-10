@@ -1,5 +1,5 @@
 (ns com.semperos.rankle
-  (:refer-clojure :exclude [+ - * / > < >= <= count])
+  (:refer-clojure :exclude [= + - * / > < >= <= count])
   (:require [clojure.core.matrix :as mx]
             [clojure.core.memoize :as memo]
             [clojure.set :as set]
@@ -38,6 +38,44 @@
         (f arg0 arg1)
         (map #(f arg0 %) arg1))))))
 
+(defprotocol IIndexable
+  (index-of [this x] "Return 0-based index of `x` in `this` or the length of `this` if `x` is not present."))
+
+(extend-protocol IIndexable
+  clojure.lang.Indexed
+  (index-of [this x]
+    (let [idx (.indexOf this x)]
+      (if (clojure.core/= idx -1)
+        (count this)
+        idx)))
+
+  String
+  (index-of [this x]
+    (let [idx (.indexOf this (str x))]
+      (if (clojure.core/= idx -1)
+        (count this)
+        idx)))
+
+  Object
+  (index-of [this x]
+    (let [idx (.indxOf this x)]
+      (if (clojure.core/= idx -1)
+        (count this)
+        idx))))
+
+(declare *)
+(defn in
+  "J's i."
+  ([n]
+   (cond
+     (number? n) (range n)
+     (and (vector? n) (every? number? n)) (reshape n (range (reduce * 1 n)))
+     :else (throw (IllegalArgumentException. "For 1-arity in, you must supply either a number or a vector of numbers."))))
+  ([x y]
+   (if (seqable? y)
+     (map (partial in x) y)
+     (index-of x y))))
+
 (defn- wrap [y] (if (seqable? y) y [y]))
 
 (defn over
@@ -60,6 +98,22 @@
          res
          (first res))))))
 
+(declare +)
+(defn prefixes [coll]
+  (if (empty? coll)
+    coll
+    (map #(take % coll) (+ 1 (in (count coll))))))
+
+(defn prefix
+  "J's \\ adverb.
+
+  Monadic - u Prefix y
+  Dyadic  - x u Infix y"
+  [f]
+  (fn prefixly
+    ([coll]
+     (map f (prefixes (vec coll))))))
+
 (defn check-ragged
   [x y]
   (let [shape-x (shape x)
@@ -67,8 +121,8 @@
         cx (count shape-x)
         cy (count shape-y)
         min' (min cx cy)]
-    (when-not (= (take min' shape-x)
-                 (take min' shape-y))
+    (when-not (clojure.core/= (take min' shape-x)
+                              (take min' shape-y))
       (throw (ex-info (str "The shape of the lower-ranked argument must "
                            "match the common frame of the shape of the higher "
                            "ranked argument , but x had shape " shape-x
@@ -76,8 +130,6 @@
                       {:x shape-x
                        :y shape-y})))))
 
-
-;; Examples of multi-ranked arithmetic functions.
 (defn +
   ([] 0)
   ([x] x)
@@ -131,6 +183,20 @@
      :else (clojure.core// x y)))
   ([x y & more]
    (reduce / (/ x y) more)))
+
+(defn =
+  ([x] (if (seqable? x)
+         ((rank = 0) x)
+         1))
+  ([x y]
+   (check-ragged x y)
+   (cond
+     (and (seqable? x) (seqable? y)) (map = x y)
+     (seqable? x) (map (rank #(= % y) 0) x)
+     (seqable? y) (map (rank (partial = x) 0) y)
+     :else (if (clojure.core/= x y) 1 0)))
+  ([x y & more]
+   (reduce = (= x y) more)))
 
 (defn >
   ([x] (if (seqable? x)
@@ -188,31 +254,6 @@
   ([x y & more]
    (reduce <= (<= x y) more)))
 
-(defprotocol IIndexable
-  (index-of [this x] "Return 0-based index of `x` in `this` or the length of `this` if `x` is not present."))
-
-(extend-protocol IIndexable
-  clojure.lang.Indexed
-  (index-of [this x]
-    (let [idx (.indexOf this x)]
-      (if (= idx -1)
-        (count this)
-        idx)))
-
-  String
-  (index-of [this x]
-    (let [idx (.indexOf this (str x))]
-      (if (= idx -1)
-        (count this)
-        idx)))
-
-  Object
-  (index-of [this x]
-    (let [idx (.indxOf this x)]
-      (if (= idx -1)
-        (count this)
-        idx))))
-
 ;; TODO Consider fill
 (defn ravel
   "J's ,
@@ -231,18 +272,6 @@
      (seqable? y) (ravel [x] y)
      :else (ravel [x] [y]))))
 
-(defn in
-  "J's i."
-  ([n]
-   (cond
-     (number? n) (range n)
-     (and (vector? n) (every? number? n)) (reshape n (range (reduce * 1 n)))
-     :else (throw (IllegalArgumentException. "For 1-arity in, you must supply either a number or a vector of numbers."))))
-  ([x y]
-   (if (seqable? y)
-     (map (partial in x) y)
-     (index-of x y))))
-
 (defn from
   "J's left-curly"
   [x y]
@@ -251,7 +280,7 @@
     (nth y x)))
 
 (def alphabet
-  (map char (range 256)))
+  (mapv char (range 256)))
 
 ;; TODO base, antibase https://code.jsoftware.com/wiki/Vocabulary/numberdot
 (defn ?
@@ -384,8 +413,8 @@
   ([start end]
    ;; TODO Lazy
    (loop [current start idx 0 res [start]]
-     (if (or (= current end)
-             (= idx end))
+     (if (or (clojure.core/= current end)
+             (clojure.core/= idx end))
        res
        (let [nxt (succ current)
              nxt-idx (inc idx)]
@@ -470,7 +499,7 @@
     (select-keys y x)
 
     (coll? x)
-    (if (= (count x) 1)
+    (if (clojure.core/= (count x) 1)
       (let [n (first x)]
         (mapcat #(repeat n %) y))
       (do (check-ragged x y)

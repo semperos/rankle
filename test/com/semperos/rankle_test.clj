@@ -1,5 +1,5 @@
 (ns com.semperos.rankle-test
-  (:refer-clojure :exclude [+ - * / < <= > >= count])
+  (:refer-clojure :exclude [= + - * / < <= > >= count])
   (:require [clojure.test :refer :all]
             [com.semperos.rankle :refer :all]))
 
@@ -60,6 +60,14 @@
          (from [65 97] alphabet)))
   (is (= [1 6 11]
          ((rank from 1) 1 (in [3 5])))))
+
+(deftest test-over
+  (is (= 10
+         ((over +) (in 5)))))
+
+(deftest test-prefix
+  (is (= [1 3 6]
+         ((prefix (over +)) [1 2 3]))))
 
 (deftest test-unicode
   (is (= \π
