@@ -38,6 +38,44 @@
         (f arg0 arg1)
         (map #(f arg0 %) arg1))))))
 
+(defprotocol IIndexable
+  (index-of [this x] "Return 0-based index of `x` in `this` or the length of `this` if `x` is not present."))
+
+(extend-protocol IIndexable
+  clojure.lang.Indexed
+  (index-of [this x]
+    (let [idx (.indexOf this x)]
+      (if (clojure.core/= idx -1)
+        (count this)
+        idx)))
+
+  String
+  (index-of [this x]
+    (let [idx (.indexOf this (str x))]
+      (if (clojure.core/= idx -1)
+        (count this)
+        idx)))
+
+  Object
+  (index-of [this x]
+    (let [idx (.indxOf this x)]
+      (if (clojure.core/= idx -1)
+        (count this)
+        idx))))
+
+(declare *)
+(defn in
+  "J's i."
+  ([n]
+   (cond
+     (number? n) (range n)
+     (and (vector? n) (every? number? n)) (reshape n (range (reduce * 1 n)))
+     :else (throw (IllegalArgumentException. "For 1-arity in, you must supply either a number or a vector of numbers."))))
+  ([x y]
+   (if (seqable? y)
+     (map (partial in x) y)
+     (index-of x y))))
+
 (defn- wrap [y] (if (seqable? y) y [y]))
 
 (defn over
@@ -60,10 +98,11 @@
          res
          (first res))))))
 
+(declare +)
 (defn prefixes [coll]
   (if (empty? coll)
     coll
-    (map (fn [n] (take n coll)) (+ 1 (in (count coll))))))
+    (map #(take % coll) (+ 1 (in (count coll))))))
 
 (defn prefix
   "J's \\ adverb.
@@ -215,31 +254,6 @@
   ([x y & more]
    (reduce <= (<= x y) more)))
 
-(defprotocol IIndexable
-  (index-of [this x] "Return 0-based index of `x` in `this` or the length of `this` if `x` is not present."))
-
-(extend-protocol IIndexable
-  clojure.lang.Indexed
-  (index-of [this x]
-    (let [idx (.indexOf this x)]
-      (if (clojure.core/= idx -1)
-        (count this)
-        idx)))
-
-  String
-  (index-of [this x]
-    (let [idx (.indexOf this (str x))]
-      (if (clojure.core/= idx -1)
-        (count this)
-        idx)))
-
-  Object
-  (index-of [this x]
-    (let [idx (.indxOf this x)]
-      (if (clojure.core/= idx -1)
-        (count this)
-        idx))))
-
 ;; TODO Consider fill
 (defn ravel
   "J's ,
@@ -257,18 +271,6 @@
      (seqable? x) (ravel x [y])
      (seqable? y) (ravel [x] y)
      :else (ravel [x] [y]))))
-
-(defn in
-  "J's i."
-  ([n]
-   (cond
-     (number? n) (range n)
-     (and (vector? n) (every? number? n)) (reshape n (range (reduce * 1 n)))
-     :else (throw (IllegalArgumentException. "For 1-arity in, you must supply either a number or a vector of numbers."))))
-  ([x y]
-   (if (seqable? y)
-     (map (partial in x) y)
-     (index-of x y))))
 
 (defn from
   "J's left-curly"
