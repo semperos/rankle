@@ -1,5 +1,5 @@
 (ns com.semperos.rankle-test
-  (:refer-clojure :exclude [+ - * / < <= > >= count])
+  (:refer-clojure :exclude [= + - * / < <= > >= count])
   (:require [clojure.test :refer :all]
             [com.semperos.rankle :refer :all]))
 

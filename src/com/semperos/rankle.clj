@@ -1,5 +1,5 @@
 (ns com.semperos.rankle
-  (:refer-clojure :exclude [+ - * / > < >= <= count])
+  (:refer-clojure :exclude [= + - * / > < >= <= count])
   (:require [clojure.core.matrix :as mx]
             [clojure.core.memoize :as memo]
             [clojure.set :as set]
@@ -82,8 +82,8 @@
         cx (count shape-x)
         cy (count shape-y)
         min' (min cx cy)]
-    (when-not (= (take min' shape-x)
-                 (take min' shape-y))
+    (when-not (clojure.core/= (take min' shape-x)
+                              (take min' shape-y))
       (throw (ex-info (str "The shape of the lower-ranked argument must "
                            "match the common frame of the shape of the higher "
                            "ranked argument , but x had shape " shape-x
@@ -91,8 +91,6 @@
                       {:x shape-x
                        :y shape-y})))))
 
-
-;; Examples of multi-ranked arithmetic functions.
 (defn +
   ([] 0)
   ([x] x)
@@ -146,6 +144,20 @@
      :else (clojure.core// x y)))
   ([x y & more]
    (reduce / (/ x y) more)))
+
+(defn =
+  ([x] (if (seqable? x)
+         ((rank = 0) x)
+         1))
+  ([x y]
+   (check-ragged x y)
+   (cond
+     (and (seqable? x) (seqable? y)) (map = x y)
+     (seqable? x) (map (rank #(= % y) 0) x)
+     (seqable? y) (map (rank (partial = x) 0) y)
+     :else (if (clojure.core/= x y) 1 0)))
+  ([x y & more]
+   (reduce = (= x y) more)))
 
 (defn >
   ([x] (if (seqable? x)
@@ -210,21 +222,21 @@
   clojure.lang.Indexed
   (index-of [this x]
     (let [idx (.indexOf this x)]
-      (if (= idx -1)
+      (if (clojure.core/= idx -1)
         (count this)
         idx)))
 
   String
   (index-of [this x]
     (let [idx (.indexOf this (str x))]
-      (if (= idx -1)
+      (if (clojure.core/= idx -1)
         (count this)
         idx)))
 
   Object
   (index-of [this x]
     (let [idx (.indxOf this x)]
-      (if (= idx -1)
+      (if (clojure.core/= idx -1)
         (count this)
         idx))))
 
@@ -399,8 +411,8 @@
   ([start end]
    ;; TODO Lazy
    (loop [current start idx 0 res [start]]
-     (if (or (= current end)
-             (= idx end))
+     (if (or (clojure.core/= current end)
+             (clojure.core/= idx end))
        res
        (let [nxt (succ current)
              nxt-idx (inc idx)]
@@ -485,7 +497,7 @@
     (select-keys y x)
 
     (coll? x)
-    (if (= (count x) 1)
+    (if (clojure.core/= (count x) 1)
       (let [n (first x)]
         (mapcat #(repeat n %) y))
       (do (check-ragged x y)
