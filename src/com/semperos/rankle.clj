@@ -63,11 +63,7 @@
 (defn prefixes [coll]
   (if (empty? coll)
     coll
-    (loop [idx 0 ret []]
-      (if (clojure.core/<= idx (count coll))
-        (recur (inc idx)
-               (conj ret (subvec coll 0 idx)))
-        (next ret)))))
+    (map (fn [n] (take n coll)) (+ 1 (in (count coll))))))
 
 (defn prefix
   "J's \\ adverb.
