@@ -60,6 +60,25 @@
          res
          (first res))))))
 
+(defn prefixes [coll]
+  (if (empty? coll)
+    coll
+    (loop [idx 0 ret []]
+      (if (clojure.core/<= idx (count coll))
+        (recur (inc idx)
+               (conj ret (subvec coll 0 idx)))
+        (next ret)))))
+
+(defn prefix
+  "J's \\ adverb.
+
+  Monadic - u Prefix y
+  Dyadic  - x u Infix y"
+  [f]
+  (fn prefixly
+    ([coll]
+     (map f (prefixes (vec coll))))))
+
 (defn check-ragged
   [x y]
   (let [shape-x (shape x)
