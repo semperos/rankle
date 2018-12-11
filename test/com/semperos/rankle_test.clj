@@ -4,6 +4,7 @@
             [com.semperos.rankle :refer :all]))
 
 (def ^:private one? (partial = 1))
+(def clj= clojure.core/=)
 
 (deftest test-rank
   (let [table (in [2 3])]
@@ -63,11 +64,40 @@
 
 (deftest test-over
   (is (= 10
-         ((over +) (in 5)))))
+         ((over +) (in 5))))
+  (is (= 11
+         ((over +) :init 1 (in 5)))
+      "The function returned from `over` can take :init + init value.")
+  (is (= 12
+         ((over + 2) (in 5)))
+      "The `over` function accepts an init value for the reduction."))
 
 (deftest test-prefix
+  ;; TODO Consider fill/ragged
+  (is (= '((1) (1 2) (1 2 3))
+         ((prefix identity) [1 2 3])))
   (is (= [1 3 6]
          ((prefix (over +)) [1 2 3]))))
+
+(deftest test-rot
+  (is (= [2 1 0] (rot (in 3))))
+  (let [coll '(a b c d)]
+    (are [n result] (= result (rot n coll))
+       0 coll
+       1 '(b c d a)
+       2 '(c d a b)
+       3 '(d a b c)
+       4 '(a b c d)
+      -1 '(d a b c)
+      -2 '(c d a b)
+      -3 '(b c d a)
+      -4 '(a b c d))))
+
+(deftest test-tally
+  (is (= 3 (tally (in 3))))
+  (is (= 2 (tally (in [2 3]))))
+  (is (= [3 3] ((rank tally 1) (in [2 3]))))
+  (is (= [[4 4 4] [4 4 4]] ((rank tally 1) (in [2 3 4])))))
 
 (deftest test-unicode
   (is (= \π
@@ -75,10 +105,22 @@
   (is (= '(\♠ \♡ \♢ \♣)
          (unicode (+ 0x2660 (in 4))))))
 
+(deftest test-=
+  (is (one? (= 3 3)))
+  (is (zero? (= 3 4)))
+  (is (clj= [1 0 1]
+            (= 3 [3 4 3])))
+  (is (clj= [[0 1 0]
+             [1 0 1]]
+            (= 3 [[4 3 4]
+                  [3 4 3]])))
+  (is (clj= [1 0 1]
+            (= [5 4 5] [5 6 5]))))
+
 (deftest test-?
   (is (every? (partial > 10) (? (range 10))))
   (is (every? (partial > 10) (? 10 10)))
-  (is (= 10 (count (? 10 10)))))
+  (is (= 10 (tally (? 10 10)))))
 
 (deftest test-deal-deck
   (let [s (unicode (+ 0x2660 (in 4)))

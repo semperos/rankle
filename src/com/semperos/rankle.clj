@@ -2,11 +2,18 @@
   (:refer-clojure :exclude [= + - * / > < >= <= count])
   (:require [clojure.core.matrix :as mx]
             [clojure.core.memoize :as memo]
+            [clojure.pprint :refer [cl-format]]
             [clojure.set :as set]
             [clojure.string :as str]
             [clojure.walk :as walk]
-            [com.semperos.rankle.util :refer [cond-table print-table] :as util])
+            [com.semperos.rankle.util
+             :refer [cond-table defalias print-table]
+             :as util])
   (:import [java.io Writer]))
+
+;;;;;;;;;;;;;;;;;;
+;; Shape & Rank ;;
+;;;;;;;;;;;;;;;;;;
 
 (defn ^{:rank ##Inf}
   count
@@ -38,6 +45,26 @@
         (f arg0 arg1)
         (map #(f arg0 %) arg1))))))
 
+(defn check-ragged
+  [x y]
+  (let [shape-x (shape x)
+        shape-y (shape y)
+        cx (count shape-x)
+        cy (count shape-y)
+        min' (min cx cy)]
+    (when-not (clojure.core/= (take min' shape-x)
+                              (take min' shape-y))
+      (throw (ex-info (str "The shape of the lower-ranked argument must "
+                           "match the common frame of the shape of the higher "
+                           "ranked argument , but x had shape " shape-x
+                           "and y had shape " shape-y)
+                      {:x shape-x
+                       :y shape-y})))))
+
+;;;;;;;;;;;;;;;;;;;;
+;; Implementation ;;
+;;;;;;;;;;;;;;;;;;;;
+
 (defprotocol IIndexable
   (index-of [this x] "Return 0-based index of `x` in `this` or the length of `this` if `x` is not present."))
 
@@ -58,7 +85,7 @@
 
   Object
   (index-of [this x]
-    (let [idx (.indxOf this x)]
+    (let [idx (.indexOf this x)]
       (if (clojure.core/= idx -1)
         (count this)
         idx))))
@@ -83,20 +110,46 @@
 
   Monadic - u Insert y
   Dyadic  - x u Table y"
-  [f]
-  (fn overly
-    ([coll]
-     (reduce (fn [acc x]
-               (f acc x))
-             coll))
-    ([x y]
-     (let [res (for [x (wrap x)]
-                 (for [y (wrap y)]
-                   (f x y)))]
-       (if (and (seqable? x)
-                (seqable? y))
-         res
-         (first res))))))
+  ([f]
+   (with-meta
+     (fn overly
+       ([coll]
+        (reduce (fn [acc x]
+                  (f acc x))
+                coll))
+       ([x y]
+        (let [res (for [x (wrap x)]
+                    (for [y (wrap y)]
+                      (f x y)))]
+          (if (and (seqable? x)
+                   (seqable? y))
+            res
+            (first res))))
+       ;; TODO Consider if this is right place, or if belongs in `over` itself.
+       ([init-kw init coll]
+        (reduce (fn [acc x]
+                  (f acc x))
+                init
+                coll)))
+     {::over f}))
+  ([f init]
+   (with-meta
+     (fn overly
+       ([coll]
+        (reduce (fn [acc x]
+                  (f acc x))
+                init
+                coll))
+       ([x y]
+        (let [res (for [x (wrap x)]
+                    (for [y (wrap y)]
+                      (f x y)))]
+          (if (and (seqable? x)
+                   (seqable? y))
+            res
+            (first res)))))
+     {::over f
+      ::init init})))
 
 (declare +)
 (defn prefixes [coll]
@@ -108,27 +161,15 @@
   "J's \\ adverb.
 
   Monadic - u Prefix y
-  Dyadic  - x u Infix y"
+  (TODO) Dyadic  - x u Infix y"
   [f]
   (fn prefixly
     ([coll]
-     (map f (prefixes (vec coll))))))
-
-(defn check-ragged
-  [x y]
-  (let [shape-x (shape x)
-        shape-y (shape y)
-        cx (count shape-x)
-        cy (count shape-y)
-        min' (min cx cy)]
-    (when-not (clojure.core/= (take min' shape-x)
-                              (take min' shape-y))
-      (throw (ex-info (str "The shape of the lower-ranked argument must "
-                           "match the common frame of the shape of the higher "
-                           "ranked argument , but x had shape " shape-x
-                           "and y had shape " shape-y)
-                      {:x shape-x
-                       :y shape-y})))))
+     (if-let [f' (::over (meta f))]
+       (if-let [init (::init (meta f))]
+         (reductions f' init coll)
+         (reductions f' coll))
+       (map f (prefixes coll))))))
 
 (defn +
   ([] 0)
@@ -254,6 +295,55 @@
   ([x y & more]
    (reduce <= (<= x y) more)))
 
+;; TODO base, antibase https://code.jsoftware.com/wiki/Vocabulary/numberdot
+
+(declare from)
+(defn ?
+  "J's ?.
+
+  Monadic - Roll y
+  Dyadic  - x Deal y"
+  ([y]
+   (if (seqable? y)
+     (map ? y)
+     (rand-int y)))
+  ([x y]
+   (let [ys (in y)]
+     (repeatedly x #(from (rand-int y) ys)))))
+
+(def alphabet
+  (mapv char (range 256)))
+
+(defn copy
+  "Creates a new collection in which each integer in `x` controls how many
+  times the corresponding item of `y` appears.
+
+  If `y` is a map, `x` should be a list of keys to copy into a new map."
+  [x y]
+  (let [ret (cond
+              (map? y)
+              (select-keys y x)
+
+              (seqable? x)
+              (if (clojure.core/= (count x) 1)
+                (let [n (first x)]
+                  (mapcat #(repeat n %) y))
+                (do (check-ragged x y)
+                    (mapcat #(repeat %1 %2) x y)))
+
+              :else ;; x is atomic value
+              (mapcat #(repeat x %) y))]
+    (if (string? y)
+      (apply str ret)
+      ret)))
+
+(defn from
+  "J's left-curly"
+  [x y]
+  (if (seqable? x)
+    (map #(from % y) x)
+    (nth y x)))
+
 ;; TODO Consider fill
 (defn ravel
   "J's ,
@@ -272,29 +362,27 @@
      (seqable? y) (ravel [x] y)
      :else (ravel [x] [y]))))
 
-(defn from
-  "J's left-curly"
-  [x y]
-  (if (seqable? x)
-    (map #(from % y) x)
-    (nth y x)))
+(defn rot
+  "J's dyadic |.
 
-(def alphabet
-  (mapv char (range 256)))
-
-;; TODO base, antibase https://code.jsoftware.com/wiki/Vocabulary/numberdot
-(defn ?
-  "J's ?.
-
-  Monadic - Roll y
-  Dyadic  - x Deal y"
+  Monadic - Reverse y
+  Dyadic  - x Rotate y"
   ([y]
-   (if (seqable? y)
-     (map ? y)
-     (rand-int y)))
+   (let [ret (reverse y)]
+     (if (string? y)
+       (apply str ret)
+       ret)))
   ([x y]
-   (let [ys (in y)]
-     (repeatedly x #(from (rand-int y) ys)))))
+   (if (string? y)
+     (apply str (mx/rotate (seq y) [x]))
+     (mx/rotate y [x]))))
+
+(defn tally
+  "J's #"
+  ([y]
+   (count y))
+  ([x y]
+   (copy x y)))
 
 (defn unicode
   [y]
@@ -305,27 +393,20 @@
 ;;;;;;;;;;;;;;
 ;; Printing ;;
 ;;;;;;;;;;;;;;
-(def ^:dynamic *hack* 2)
-
 (defn print-aligned
   ([rows]
-   (if-not (coll? (first rows))
+   (if-not (seqable? (first rows))
      (println (str/join " " rows))
-     (doseq [xs rows]
-       (if-not (coll? (first xs))
-         (let [largest (util/largest xs)]
-           (doseq [x xs]
-             ;; Hack for bad alignment at present:
-             (print (format (str "%" (inc (max *hack* largest)) "s") x))))
-         (print-aligned xs))
-       (println))))
-  ;; This is superseded by `reshape`
-  ([n rows]
-   (let [largest (util/largest rows)]
-     (doseq [xs (partition-all n rows)]
+     (print-aligned (util/largest rows) rows)))
+  ([largest rows]
+   (doseq [xs rows]
+     (if-not (seqable? (first xs))
        (doseq [x xs]
          (print (format (str "%" (inc largest) "s") x)))
-       (println)))))
+       (print-aligned largest xs))
+     (println))))
+
+(defalias pp print-aligned)
 
 (defn- type-name
   [x]
@@ -487,26 +568,6 @@
                          args-second)))
                     args-first)]
       (print-table ks rows))))
-
-(defn copy
-  "Creates a new collection in which each integer in `x` controls how many
-  times the corresponding item of `y` appears.
-
-  If `y` is a map, `x` should be a list of keys to copy into a new map."
-  [x y]
-  (cond
-    (map? y)
-    (select-keys y x)
-
-    (coll? x)
-    (if (clojure.core/= (count x) 1)
-      (let [n (first x)]
-        (mapcat #(repeat n %) y))
-      (do (check-ragged x y)
-          (mapcat #(repeat %1 %2) x y)))
-
-    :else ;; x is atomic value
-    (mapcat #(repeat x %) y)))
 
 (comment
   (copy [1 0 1] ['a 'b 'c])

@@ -20,5 +20,10 @@ well as the [fsm-clj](https://github.com/fbeline/fsm-clj) library which are
 
 > under the Eclipse Public License either version 1.0 or (at your option) any later version.
 
+The `com.semperos.rankle.util/defalias` macro was copied from
+[jackknife](https://github.com/sritchie/jackknife/blob/03bbd8584878914d28b7ad31225700c3ed306b4c/src/jackknife/def.clj#L22)
+and is [licensed](https://github.com/sritchie/jackknife/blob/master/LICENSE.txt)
+under the Apache License, Version 2.0.
+
 All other original source code in this repository is distributed under the
 Mozilla Public License version 2.0.
