@@ -402,16 +402,14 @@
 
 (defn nub-sieve
   [y]
-  (:items
-   (reduce
-    (fn [{:keys [seen] :as acc} n]
-      (if (seen n)
-        (update acc :items conj 0)
-        (-> acc
-            (update :seen conj n)
-            (update :items conj 1))))
-    {:items [] :seen #{}}
-    y)))
+  (let [seen (volatile! #{})]
+    (map (fn [item]
+           (if (@seen item)
+             0
+             (do
+               (vswap! seen conj item)
+               1)))
+         y)))
 
 ;; TODO Consider fill
 (defn ravel
