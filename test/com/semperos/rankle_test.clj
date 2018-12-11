@@ -1,10 +1,7 @@
 (ns com.semperos.rankle-test
-  (:refer-clojure :exclude [= + - * / < <= > >= count])
+  (:refer-clojure :exclude [= + - * / < <= > >= count not drop take])
   (:require [clojure.test :refer :all]
             [com.semperos.rankle :refer :all]))
-
-(def ^:private one? (partial = 1))
-(def clj= clojure.core/=)
 
 (deftest test-rank
   (let [table (in [2 3])]
@@ -62,6 +59,10 @@
   (is (= [1 6 11]
          ((rank from 1) 1 (in [3 5])))))
 
+(deftest test-nub-sieve
+  (is (= [1 1 1 0 1 0 1 0 0]
+         (nub-sieve [1 2 3 2 4 3 5 2 1]))))
+
 (deftest test-over
   (is (= 10
          ((over +) (in 5))))
@@ -83,11 +84,11 @@
   (is (= [2 1 0] (rot (in 3))))
   (let [coll '(a b c d)]
     (are [n result] (= result (rot n coll))
-       0 coll
-       1 '(b c d a)
-       2 '(c d a b)
-       3 '(d a b c)
-       4 '(a b c d)
+      0 coll
+      1 '(b c d a)
+      2 '(c d a b)
+      3 '(d a b c)
+      4 '(a b c d)
       -1 '(d a b c)
       -2 '(c d a b)
       -3 '(b c d a)
@@ -108,14 +109,14 @@
 (deftest test-=
   (is (one? (= 3 3)))
   (is (zero? (= 3 4)))
-  (is (clj= [1 0 1]
-            (= 3 [3 4 3])))
-  (is (clj= [[0 1 0]
-             [1 0 1]]
-            (= 3 [[4 3 4]
-                  [3 4 3]])))
-  (is (clj= [1 0 1]
-            (= [5 4 5] [5 6 5]))))
+  (is (c= [1 0 1]
+          (= 3 [3 4 3])))
+  (is (c= [[0 1 0]
+           [1 0 1]]
+          (= 3 [[4 3 4]
+                [3 4 3]])))
+  (is (c= [1 0 1]
+          (= [5 4 5] [5 6 5]))))
 
 (deftest test-?
   (is (every? (partial > 10) (? (range 10))))
