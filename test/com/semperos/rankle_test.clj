@@ -60,6 +60,14 @@
     (is (= '((\a \b) (\c \d))
            (from idxs s)))))
 
+(deftest test-indices
+  (is (= [2 4 5]
+         (indices [0 0 1 0 1 1]))))
+
+(deftest test-intervals
+  (is (= ["ab" "cde"]
+         (intervals [1 0 1 0 0] "abcde"))))
+
 (deftest test-from
   (is (= \b
          (from 1 "abc")))

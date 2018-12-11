@@ -408,12 +408,45 @@
     ([x y]
      (g (f x y) (h x y)))))
 
+(defn from*
+  [x y]
+  (if (seqable? x)
+    (map #(from* % y) x)
+    (nth y x)))
+
 (defn from
   "J's left-curly"
   [x y]
-  (if (seqable? x)
-    (map #(from % y) x)
-    (nth y x)))
+  (let [x-seqable? (seqable? x)
+        ret (if x-seqable?
+              (map #(from* % y) x)
+              (nth y x))]
+    (if (and x-seqable? (string? y))
+      (apply str ret)
+      ret)))
+
+(defn intervals
+  "J's ;.
+
+  Monadic - u Self Intervals x
+  Dyadic  - x u Intervals y
+
+  See https://code.jsoftware.com/wiki/Vocabulary/semidot1"
+  ([y]
+   ;; y=: 'alpha bravo charlie'
+   ;; (<;._1) ' ',y
+   ;;  +-----+-----+-------+
+   ;;  |alpha|bravo|charlie|
+   ;;  +-----+-----+-------+
+   )
+  ([x y]
+   (let [idxs (indices x)
+         lidx (volatile! 0)]
+     (map (fn [idx]
+            (let [ret (from (range @lidx idx) y)]
+              (vreset! lidx idx)
+              ret))
+          (concat (rest idxs) [(count y)])))))
 
 (defn not
   [y]
@@ -474,6 +507,30 @@
    (if (string? y)
      (apply str (mx/rotate (seq y) [x]))
      (mx/rotate y [x]))))
+
+;; TODO sorting/grading
+#_(defn asc
+  "J's /:
+
+  Monadic - Grade Up y
+  Dyadic  - x Sort Up y
+
+  Common idiom is to use `reflex` to sort:
+
+  ((reflex asc) [3 6 2 4]) ;=> [2 3 4 6]"
+  ([y]
+   (let [sorted (sort y)]
+     (loop [indices [] items sorted]
+       (if-let [item (first items)]
+         (index-of ))
+       (index-of y))))
+  ([x y]
+   (let [ret (if (c= x y)
+               (sort x)
+               (from (in y (sort y)) x))]
+     (if (string? y)
+       (apply str ret)
+       ret))))
 
 (defn tally
   "J's #"
