@@ -20,6 +20,15 @@
            ((rank next 1) table))
         "Next of each 1-rank cell (sublist)")))
 
+(deftest test-fork
+  ;; Cases from examples on http://jsoftware.com/help/learning/09.htm
+  (let [mean (fork / (over +) count)]
+    (is (= 50
+           (mean (in 101)))))
+  (let [give-or-take (fork ravel + -)]
+    (is (= [12 8]
+           (give-or-take 10 2)))))
+
 (deftest test->
   (is (one? (> 3 2)))
   (is (= []

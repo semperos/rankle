@@ -387,6 +387,27 @@
       (apply str ret)
       ret)))
 
+(defn fork
+  "J's fork, verb composition.
+
+  Classic APL example, arithmetic mean:
+
+  +/ % #
+
+  Which divides the sum of the argument's items by their count.
+
+  We'll see how far we can get with just forks, as hooks are a
+  specialization of forks.
+
+  TODO Consider order of arguments. Current matches Lisper's intuition.
+  TODO Consider the capped fork use-case for `f` called monadically."
+  [g f h]
+  (fn forky
+    ([y]
+     (g (f y) (h y)))
+    ([x y]
+     (g (f x y) (h x y)))))
+
 (defn from
   "J's left-curly"
   [x y]
@@ -428,6 +449,16 @@
      (seqable? x) (ravel x [y])
      (seqable? y) (ravel [x] y)
      :else (ravel [x] [y]))))
+
+(defn reflex
+  "J's ~
+
+  Monadic - y u Reflex y
+  Dyadic  - y u Reflex x"
+  [f]
+  (fn
+    ([y] (f y y))
+    ([x y] (f y x))))
 
 (defn rot
   "J's dyadic |.
