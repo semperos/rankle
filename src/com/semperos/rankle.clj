@@ -171,6 +171,11 @@
          (reductions f' coll))
        (map f (prefixes coll))))))
 
+;; TODO Consider what from clojure.core.matrix could be used here.
+;;      N.B. The implementation of mx/add, for example, is not
+;;      equivalent to this, because this check-ragged allows for
+;;      operations on data of different shape as long as the common
+;;      frame is equal.
 (defn +
   ([] 0)
   ([x] x)
