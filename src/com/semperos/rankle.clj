@@ -1,5 +1,5 @@
 (ns com.semperos.rankle
-  (:refer-clojure :exclude [= + - * / > < >= <= count])
+  (:refer-clojure :exclude [= + - * / > < >= <= count drop not take])
   (:require [clojure.core.matrix :as mx]
             [clojure.core.memoize :as memo]
             [clojure.pprint :refer [cl-format]]
@@ -11,6 +11,20 @@
              :as util])
   (:import [java.io Writer]))
 
+(defalias c* clojure.core/*)
+(defalias c+ clojure.core/+)
+(defalias c- clojure.core/-)
+(defalias c< clojure.core/<)
+(defalias c<= clojure.core/<=)
+(defalias c= clojure.core/=)
+(defalias c> clojure.core/>)
+(defalias c>= clojure.core/>=)
+(defalias ccount clojure.core/count)
+(defalias cdiv clojure.core//)
+(defalias cdrop clojure.core/drop)
+(defalias cnot clojure.core/not)
+(defalias ctake clojure.core/take)
+
 ;;;;;;;;;;;;;;;;;;
 ;; Shape & Rank ;;
 ;;;;;;;;;;;;;;;;;;
@@ -18,7 +32,7 @@
 (defn ^{:rank ##Inf}
   count
   [coll]
-  (clojure.core/count coll))
+  (ccount coll))
 
 (defn shape
   [x]
@@ -37,11 +51,11 @@
   ([f r]
    (fn rankle
      ([arg0]
-      (if (clojure.core/<= (rank arg0) r)
+      (if (c<= (rank arg0) r)
         (f arg0)
         (map rankle arg0)))
      ([arg0 arg1]
-      (if (clojure.core/<= (rank arg1) r)
+      (if (c<= (rank arg1) r)
         (f arg0 arg1)
         (map #(f arg0 %) arg1))))))
 
@@ -52,8 +66,8 @@
         cx (count shape-x)
         cy (count shape-y)
         min' (min cx cy)]
-    (when-not (clojure.core/= (take min' shape-x)
-                              (take min' shape-y))
+    (when-not (c= (ctake min' shape-x)
+                  (ctake min' shape-y))
       (throw (ex-info (str "The shape of the lower-ranked argument must "
                            "match the common frame of the shape of the higher "
                            "ranked argument , but x had shape " shape-x
@@ -72,23 +86,35 @@
   clojure.lang.Indexed
   (index-of [this x]
     (let [idx (.indexOf this x)]
-      (if (clojure.core/= idx -1)
+      (if (c= idx -1)
         (count this)
         idx)))
 
   String
   (index-of [this x]
     (let [idx (.indexOf this (str x))]
-      (if (clojure.core/= idx -1)
+      (if (c= idx -1)
         (count this)
         idx)))
 
   Object
   (index-of [this x]
     (let [idx (.indexOf this x)]
-      (if (clojure.core/= idx -1)
+      (if (c= idx -1)
         (count this)
         idx))))
+
+(def one? (partial c= 1))
+
+(defalias head first)
+(defalias tail rest)
+(def behead (partial cdrop 1))
+(defalias curtail butlast)
+
+;; TODO Aliasing here as reminder to consider filling,
+;;      since take fills when over-taking.
+(defalias take clojure.core/take)
+(defalias drop clojure.core/drop)
 
 (declare *)
 (defn in
@@ -102,6 +128,25 @@
    (if (seqable? y)
      (map (partial in x) y)
      (index-of x y))))
+
+(defn indices*
+  [indices y]
+  (let [cnt (count y)
+        idx (in y 1)]
+    (if (c= idx cnt)
+      indices
+      (recur (conj indices (c+ (peek indices) (inc idx)))
+             (cdrop (inc idx) y)))))
+
+;; TODO Handle higher ranked y's
+(defn indices
+  "J's I."
+  ([y]
+   (let [cnt (count y)
+         idx (in y 1)]
+     (if (c= idx cnt)
+       []
+       (indices* [idx] (cdrop (inc idx) y))))))
 
 (defn- wrap [y] (if (seqable? y) y [y]))
 
@@ -155,7 +200,7 @@
 (defn prefixes [coll]
   (if (empty? coll)
     coll
-    (map #(take % coll) (+ 1 (in (count coll))))))
+    (map #(ctake % coll) (+ 1 (in (count coll))))))
 
 (defn prefix
   "J's \\ adverb.
@@ -183,9 +228,9 @@
    (check-ragged x y)
    (cond
      (and (seqable? x) (seqable? y)) (map + x y)
-     (seqable? x) (map (rank (partial clojure.core/+ y) 0) x)
-     (seqable? y) (map (rank (partial clojure.core/+ x) 0) y)
-     :else (clojure.core/+ x y)))
+     (seqable? x) (map (rank (partial c+ y) 0) x)
+     (seqable? y) (map (rank (partial c+ x) 0) y)
+     :else (c+ x y)))
   ([x y & more]
    (reduce + (+ x y) more)))
 
@@ -196,37 +241,37 @@
    (check-ragged x y)
    (cond
      (and (seqable? x) (seqable? y)) (map * x y)
-     (seqable? x) (map (rank (partial clojure.core/* y) 0) x)
-     (seqable? y) (map (rank (partial clojure.core/* x) 0) y)
-     :else (clojure.core/* x y)))
+     (seqable? x) (map (rank (partial c* y) 0) x)
+     (seqable? y) (map (rank (partial c* x) 0) y)
+     :else (c* x y)))
   ([x y & more]
    (reduce * (* x y) more)))
 
 (defn -
   ([x] (if (seqable? x)
-         ((rank clojure.core/- 0) x)
-         (clojure.core/- x)))
+         ((rank c- 0) x)
+         (c- x)))
   ([x y]
    (check-ragged x y)
    (cond
      (and (seqable? x) (seqable? y)) (map - x y)
-     (seqable? x) (map (rank #(clojure.core/- % y) 0) x)
-     (seqable? y) (map (rank (partial clojure.core/- x) 0) y)
-     :else (clojure.core/- x y)))
+     (seqable? x) (map (rank #(c- % y) 0) x)
+     (seqable? y) (map (rank (partial c- x) 0) y)
+     :else (c- x y)))
   ([x y & more]
    (reduce - (- x y) more)))
 
 (defn /
   ([x] (if (seqable? x)
-         ((rank (partial clojure.core// 1) 0) x)
-         (clojure.core// 1 x)))
+         ((rank (partial cdiv 1) 0) x)
+         (cdiv 1 x)))
   ([x y]
    (check-ragged x y)
    (cond
      (and (seqable? x) (seqable? y)) (map / x y)
-     (seqable? x) (map (rank #(clojure.core// % y) 0) x)
-     (seqable? y) (map (rank (partial clojure.core// x) 0) y)
-     :else (clojure.core// x y)))
+     (seqable? x) (map (rank #(cdiv % y) 0) x)
+     (seqable? y) (map (rank (partial cdiv x) 0) y)
+     :else (cdiv x y)))
   ([x y & more]
    (reduce / (/ x y) more)))
 
@@ -240,7 +285,7 @@
      (and (seqable? x) (seqable? y)) (map = x y)
      (seqable? x) (map (rank #(= % y) 0) x)
      (seqable? y) (map (rank (partial = x) 0) y)
-     :else (if (clojure.core/= x y) 1 0)))
+     :else (if (c= x y) 1 0)))
   ([x y & more]
    (reduce = (= x y) more)))
 
@@ -254,7 +299,7 @@
      (and (seqable? x) (seqable? y)) (map > x y)
      (seqable? x) (map (rank #(> % y) 0) x)
      (seqable? y) (map (rank (partial > x) 0) y)
-     :else (if (clojure.core/> x y) 1 0)))
+     :else (if (c> x y) 1 0)))
   ([x y & more]
    (reduce > (> x y) more)))
 
@@ -268,7 +313,7 @@
      (and (seqable? x) (seqable? y)) (map >= x y)
      (seqable? x) (map (rank #(>= % y) 0) x)
      (seqable? y) (map (rank (partial >= x) 0) y)
-     :else (if (clojure.core/>= x y) 1 0)))
+     :else (if (c>= x y) 1 0)))
   ([x y & more]
    (reduce >= (>= x y) more)))
 
@@ -282,7 +327,7 @@
      (and (seqable? x) (seqable? y)) (map < x y)
      (seqable? x) (map (rank #(< % y) 0) x)
      (seqable? y) (map (rank (partial < x) 0) y)
-     :else (if (clojure.core/< x y) 1 0)))
+     :else (if (c< x y) 1 0)))
   ([x y & more]
    (reduce < (< x y) more)))
 
@@ -296,7 +341,7 @@
      (and (seqable? x) (seqable? y)) (map <= x y)
      (seqable? x) (map (rank #(<= % y) 0) x)
      (seqable? y) (map (rank (partial <= x) 0) y)
-     :else (if (clojure.core/<= x y) 1 0)))
+     :else (if (c<= x y) 1 0)))
   ([x y & more]
    (reduce <= (<= x y) more)))
 
@@ -330,7 +375,7 @@
               (select-keys y x)
 
               (seqable? x)
-              (if (clojure.core/= (count x) 1)
+              (if (c= (count x) 1)
                 (let [n (first x)]
                   (mapcat #(repeat n %) y))
                 (do (check-ragged x y)
@@ -348,6 +393,25 @@
   (if (seqable? x)
     (map #(from % y) x)
     (nth y x)))
+
+(defn not
+  [y]
+  (if (seqable? y)
+    (map (rank not 0) y)
+    (- 1 y)))
+
+(defn nub-sieve
+  [y]
+  (:items
+   (reduce
+    (fn [{:keys [seen] :as acc} n]
+      (if (seen n)
+        (update acc :items conj 0)
+        (-> acc
+            (update :seen conj n)
+            (update :items conj 1))))
+    {:items [] :seen #{}}
+    y)))
 
 ;; TODO Consider fill
 (defn ravel
@@ -499,8 +563,8 @@
   ([start end]
    ;; TODO Lazy
    (loop [current start idx 0 res [start]]
-     (if (or (clojure.core/= current end)
-             (clojure.core/= idx end))
+     (if (or (c= current end)
+             (c= idx end))
        res
        (let [nxt (succ current)
              nxt-idx (inc idx)]
@@ -525,7 +589,7 @@
   ([f domain] (memo-table f domain 1000))
   ([f domain limit]
    (let [memoized (memo/lru f :lru/threshold limit)]
-     (doseq [arg (take limit domain)]
+     (doseq [arg (ctake limit domain)]
        (apply f arg))
      memoized)))
 
