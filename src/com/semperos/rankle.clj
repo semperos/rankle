@@ -1,5 +1,5 @@
 (ns com.semperos.rankle
-  (:refer-clojure :exclude [= + - * / > < >= <= count drop not take])
+  (:refer-clojure :exclude [= + - * / > < >= <= count drop not not= take])
   (:require [clojure.core.matrix :as mx]
             [clojure.core.memoize :as memo]
             [clojure.pprint :refer [cl-format]]
@@ -453,6 +453,8 @@
   (if (seqable? y)
     (map (rank not 0) y)
     (- 1 y)))
+
+(def not= (comp not =))
 
 (defn nub-sieve
   [y]
